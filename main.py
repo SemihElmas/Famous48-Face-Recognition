@@ -1,49 +1,31 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, accuracy_score
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Input
 from tensorflow.keras.utils import to_categorical
 
 # ==========================================
-# STEP 1: LOAD AND NORMALIZE THE DATA
+# STEP 1: LOAD THE DATA
 # ==========================================
+# Each file: line 1 = number of images, line 2 = pixels per image (576 = 24x24),
+# then one image per line: 576 pixel values followed by 8 attributes.
+# Attribute a3 (column 578) is the person ID (0-47).
 print("Loading data...")
-# NOTE: We assume the data files contain pixel values and the last column is the person's ID (label).
-# You may need to check 'Readme.txt' to confirm if the labels are arranged differently!
-# ==========================================
-# STEP 1: LOAD AND NORMALIZE THE DATA
-# ==========================================
+data = np.vstack([np.loadtxt(f, skiprows=2)
+                  for f in ("x24x24.txt", "y24x24.txt", "z24x24.txt")])
 
-try:
-    # We use skiprows=2 to ignore the <L> and <N> metadata lines at the top of the files
-    data_x = np.loadtxt('x24x24.txt', skiprows=2)
-    data_y = np.loadtxt('y24x24.txt', skiprows=2)
-    data_z = np.loadtxt('z24x24.txt', skiprows=2)
-    
-    # Combine the 3 separate files into one big dataset 
-    dataset = np.vstack((data_x, data_y, data_z))
-    
-    # X (Features): The first 576 columns are the pixel intensities
-    X = dataset[:, :576] 
-    
-    # y (Labels): The 'a3' attribute is the person's class number.
-    # Since columns are 0-indexed and pixels take up 0-575:
-    # a1 = 576, a2 = 577, a3 = 578
-    y = dataset[:, 578]  
+X = data[:, :576]               # pixel values (already scaled in the dataset, range ~ -1.5 to 2.8)
+y = data[:, 578].astype(int)    # person ID
 
-except Exception as e:
-    print(f"Error loading files: {e}")
-    exit()
+# No /255 scaling: the pixels are not 0-255, and dividing them
+# shrinks the inputs so much that the neural network barely learns.
 
-# Action: Normalize the data (scaling it to the [0,1] range) to prevent Gradient Explosion
-# The Readme states intensities are grayscale (typically 0-255)
-X_normalized = X / 255.0 
-
-# Split data into training (80%) and testing (20%) sets
-X_train, X_test, y_train, y_test = train_test_split(X_normalized, y, test_size=0.2, random_state=42)
+# Stratified 80/20 split, so every person appears in train and test in the same proportion
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y)
 
 # ==========================================
 # STEP 2: MODEL A - RANDOM FOREST
